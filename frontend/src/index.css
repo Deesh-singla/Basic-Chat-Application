@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+.scrollbar-hide::-webkit-scrollbar {
+  width: 7px;
+  background:black; 
+}
+
+.scrollbar-hide::-webkit-scrollbar-thumb {
+    background:#1c1c1c; 
+}

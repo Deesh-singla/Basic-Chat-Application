@@ -1,20 +1,71 @@
 import { useEffect, useRef, useState } from "react";
+import ChatBox from "./ChatBox";
 
 export default function App() {
+  interface ChatInterface {
+    type: string;
+    message: string;
+    username: string;
+  }
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [newRoomId, setNewRoomId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState<boolean>(false);
-  const usernameRef=useRef<HTMLInputElement |null>(null);
-  const roomIdRef=useRef<HTMLInputElement |null>(null);
+  const [showChat, setShowChat] = useState<boolean>(false);
+  const [userJoined, setUserJoined] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [connectedUsers, setConnectedUsers] = useState<number | null>(null)
+  const [username, setUsername] = useState<string>("");
+  const [chat, setChat] = useState<ChatInterface[]>([]);
+  const usernameRef = useRef<HTMLInputElement | null>(null);
+  const roomIdRef = useRef<HTMLInputElement | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const ws = new WebSocket("ws://localhost:8080");
+     ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "connect" })); 
+  };
+    setLoading(true);
     ws.onmessage = (msg) => {
       const parsedObj = JSON.parse(msg.data.toString());
-      console.log(parsedObj);
+      // console.log(parsedObj);
+      if (parsedObj.message === "connected") setLoading(false);
       if (parsedObj.roomId) {
         setNewRoomId(parsedObj.roomId);
       }
+
+      if (parsedObj.message == "user enter room successfully") {
+        // console.log(parsedObj);
+        setNewRoomId(parsedObj.roomId);
+        setConnectedUsers(parsedObj.usersConnected)
+        setShowChat(true);
+      }
+
+      if (parsedObj.type == "user-joined") {
+        // console.log("New user joined:", parsedObj);
+        setConnectedUsers(parsedObj.usersConnected);
+        setUserJoined(parsedObj.message);
+      }
+
+      if (parsedObj.type == "user-left") {
+        console.log("User left:", parsedObj);
+        // console.log(parsedObj.message);
+        setConnectedUsers(parsedObj.usersConnected);
+        setUserJoined(parsedObj.message);
+      }
+
+      if (parsedObj.type === "error") {
+        setErrorMsg(parsedObj.message);
+      }
+
+      if (parsedObj.type == "chat") {
+        console.log(parsedObj)
+        setChat(prev => [...prev, parsedObj])
+      }
+
+      return () => {
+        ws.close();
+      };
     };
     setSocket(ws);
   }, []);
@@ -25,12 +76,22 @@ export default function App() {
   }
 
   function handleJoinRoomBtn() {
-    // socket?.send(JSON.stringify({ type: "join_room", roomId, username }))
+    const obj = {
+      type: "join_room",
+      payload: {
+        roomId: roomIdRef.current?.value,
+        username: usernameRef.current?.value
+      }
+    }
+    if (usernameRef.current?.value) setUsername(usernameRef.current?.value);
+    socket?.send(JSON.stringify(obj))
   }
 
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-black flex justify-center items-center">
-      <div className="h-[60%] w-[90%] max-w-md border border-white/20 rounded-2xl text-white p-6 flex flex-col shadow-2xl bg-[#101010]/70 backdrop-blur-sm">
+      {loading ? <h1>Loading...</h1> :
+         showChat?<ChatBox roomId = { newRoomId } connectedUsers = { connectedUsers } userJoined = { userJoined } setUserJoined = { setUserJoined } socket = { socket } username = { username } chat = { chat } /> :
+      <div className="h-[62%] w-[90%] max-w-md border border-white/20 rounded-2xl text-white p-6 flex flex-col shadow-2xl bg-[#101010]/70 ">
         <div>
           <h1 className="text-3xl font-semibold">💬 Real-time Chat</h1>
           <p className="text-white/60 mt-2 text-sm">
@@ -82,9 +143,11 @@ export default function App() {
             >
               Join
             </button>
+            {errorMsg && <p className="text-red-600 pt-2 text-center">{errorMsg}</p>}
           </div>
         )}
       </div>
+      }
     </div>
   );
 }
