@@ -20,10 +20,12 @@ function randomRoomId() {
 app.on("connection", (socket) => {
     socket.on("message", (msg) => {
         const parsedobj = JSON.parse(msg.toString());
+        if(parsedobj.type=="connect"){
+             socket.send(JSON.stringify({message:"connected"}));
+        }
         if (parsedobj.type == "create_room") {
             let randomId = randomRoomId();
             rooms.set(randomId, [])
-            console.log(rooms)
             socket.send(JSON.stringify({ message: "room-created", roomId: randomId }));
         }   
         if (parsedobj.type == "join_room") {
@@ -34,7 +36,6 @@ app.on("connection", (socket) => {
                 return;
             }
             rooms.get(parsedobj.payload.roomId)?.push({ name: username, socket: socket })
-            console.log(rooms)
             const currentUsers = rooms.get(roomId);
             const userCount = currentUsers?.length || 0;
             socketToRoom.set(socket, roomId);
@@ -58,7 +59,6 @@ app.on("connection", (socket) => {
         }
     })
     socket.on("close", () => {
-        console.log(rooms)
         const roomId = socketToRoom.get(socket);
         if (!roomId) return;
 
