@@ -21,7 +21,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:8080");
+    const ws = new WebSocket("https://basic-chat-application-mntf.onrender.com");
      ws.onopen = () => {
     ws.send(JSON.stringify({ type: "connect" })); 
   };
