@@ -10,7 +10,7 @@ const socketToRoom: Map<WebSocket, string> = new Map();
 
 function randomRoomId() {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = ' ';
+    let result = '';
     for (let i = 0; i < 5; i++) {
         result += characters[Math.floor(Math.random() * characters.length)];
     }
@@ -25,15 +25,36 @@ app.on("connection", (socket) => {
             rooms.set(randomId, [])
             console.log(rooms)
             socket.send(JSON.stringify({ message: "room-created", roomId: randomId }));
-        }
+        }   
         if (parsedobj.type == "join_room") {
-            rooms.get(parsedobj.payload.roomId)?.push({ name: parsedobj.payload.username, socket: socket })
-            socketToRoom.set(socket, parsedobj.payload.roomId);
-            socket.send(JSON.stringify({ message: "user enter room successfully", usersConnected: rooms.get(parsedobj.payload.roomId)?.length }));
+            const roomId = parsedobj.payload.roomId;
+            const username = parsedobj.payload.username;
+            if (rooms.get(roomId) == undefined) {
+                socket.send(JSON.stringify({ type: "error", message: "Room Not available" }))
+                return;
+            }
+            rooms.get(parsedobj.payload.roomId)?.push({ name: username, socket: socket })
+            console.log(rooms)
+            const currentUsers = rooms.get(roomId);
+            const userCount = currentUsers?.length || 0;
+            socketToRoom.set(socket, roomId);
+            socket.send(JSON.stringify({ message: "user enter room successfully", usersConnected: userCount, roomId: roomId }));
+
+            currentUsers?.forEach(user => {
+                if (user.socket !== socket) {
+                    user.socket.send(JSON.stringify({
+                        type: "user-joined",
+                        message: `${username} joined the room`,
+                        usersConnected: userCount,
+                        roomId: roomId
+                    }));
+                }
+            });
         }
         if (parsedobj.type == "chat") {
             const a = rooms.get(parsedobj.payload.roomId)
-            a?.map(s => s.socket.send(parsedobj.payload.message))
+            const username = parsedobj.payload.username;
+            a?.map(s => s.socket.send(JSON.stringify({type:"chat",username:username,message:parsedobj.payload.message})))
         }
     })
     socket.on("close", () => {
